@@ -28,7 +28,7 @@ export default class Utils
 	***************************/
 	// Allows forEach even on nodelists
 	static forEach(collection, callback, pScope?:any) : void { if(collection != undefined) { Array.prototype.forEach.call(collection, callback, pScope); } }
-	
+
 	// newElement method overloads
 	static newElement(tag:"div", attributes?:CommonElementAttributes|null, parent?:HTMLElement|Element) : HTMLDivElement;
 	static newElement(tag:"span", attributes?:CommonElementAttributes|null, parent?:HTMLElement|Element) : HTMLSpanElement;
@@ -51,23 +51,23 @@ export default class Utils
 		if(parent != undefined) (<HTMLElement>parent).appendChild(element);
 		return element;
 	}
-	
+
 	static removeElement(pNode?:HTMLElement|Element|null) : void {
 		if(!pNode) { return; }
 		pNode = <HTMLElement>pNode;
 		pNode.parentNode?.removeChild(pNode);
 	}
-	
+
 	static addTextTo(pText:string, pNode:HTMLElement|Element) : void {
 		(<HTMLElement>pNode).appendChild( document.createTextNode(pText) );
 	}
-	
+
 	static elemIsVisible(pElem:HTMLElement|Element) : boolean {
 		let rect = (<HTMLElement>pElem).getBoundingClientRect();
 		let viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
 		return !(rect.bottom < 0 || rect.top - viewHeight >= 0);
 	}
-	
+
 	static insertAfter(pNewNode:HTMLElement|Element, pRef:HTMLElement|Element) : HTMLElement {
 		return <HTMLElement>(pRef.nextSibling ? pRef.parentNode?.insertBefore(pNewNode, pRef.nextSibling) : pRef.parentNode?.appendChild(pNewNode));
 		// if (pRef.nextSibling) {
@@ -76,7 +76,7 @@ export default class Utils
 		// 	return <HTMLElement>pRef.parentNode.appendChild(pNewNode);
 		// }
 	}
-	
+
 	static prependChild(pNewNode:HTMLElement|Element, pRef:HTMLElement|Element) : HTMLElement {
 		return <HTMLElement>(pRef.firstChild ? pRef.insertBefore(pNewNode, pRef.firstChild) : pRef.appendChild(pNewNode));
 		// if(pRef.firstChild) {
@@ -85,7 +85,7 @@ export default class Utils
 		// 	return <HTMLElement>pRef.appendChild(pNewNode);
 		// }
 	}
-	
+
 	/***************************
 	* Date Methods
 	***************************/
@@ -95,7 +95,7 @@ export default class Utils
 	static getDate(pDate:Date) : number	{ return Global.timezone == "utc" ? pDate.getUTCDate() : pDate.getDate(); }
 	static getMonth(pDate:Date) : number	{ return Global.timezone == "utc" ? pDate.getUTCMonth() : pDate.getMonth(); }
 	static getYear(pDate:Date) : number	{ return Global.timezone == "utc" ? pDate.getUTCFullYear() : pDate.getFullYear(); }
-	
+
 	static formatWikiTimeStamp(pDate:Date, pShowTime:boolean=true) : string {
 		let tDateString = Utils.formatWikiTimeStampDateOnly(pDate),
 			tTime = pShowTime ? Utils.formatWikiTimeStampTimeOnly(pDate) : "";
@@ -143,7 +143,7 @@ export default class Utils
 		tTime += tSuffix;
 		return tTime;
 	}
-	
+
 	// Convert from MediaWiki time format to one Date object like.
 	static getTimestampForYYYYMMDDhhmmSS(pNum:number|string) : string {
 		pNum = ""+pNum;
@@ -151,7 +151,7 @@ export default class Utils
 		return pNum.slice(i, i+=4) +"-"+ pNum.slice(i, i+=2) +"-"+ pNum.slice(i, i+=2) +"T"+ pNum.slice(i, i+=2) +":"+ pNum.slice(i, i+=2) +":"+ pNum.slice(i, i+=2);
 		// return pNum.splice(0, 4) +"-"+ pNum.splice(0, 2) +"-"+ pNum.splice(0, 2) +"T"+ pNum.splice(0, 2) +":"+ pNum.splice(0, 2) +":"+ pNum.splice(0, 2);
 	}
-	
+
 	/***************************
 	* String Methods
 	***************************/
@@ -160,7 +160,7 @@ export default class Utils
 		n = n.toString();
 		return n.length >= width ? n : new Array(width - n.length + 1).join(z.toString()) + n;
 	}
-	
+
 	// http://stackoverflow.com/a/4673436/1411473
 	static formatString(format:string, ...pArgs:(string|number|boolean)[]) : string {
 		return format.replace(/{(\d+)}/g, (match, number) => {
@@ -170,20 +170,20 @@ export default class Utils
 			;
 		});
 	}
-	
+
 	// Need to escape quote for when text is manually added to an html tag attribute.
 	static escapeCharacters(pString:string) : string {
 		return pString ? pString.replace(/"/g, '&quot;').replace(/'/g, '&apos;') : pString;
 	}
-	
+
 	static escapeCharactersUrl(pString:string) : string {
 		return mw.util.wikiUrlencode(pString);
 		//return pString ? pString.replace(/%/g, '%25').replace(/ /g, "_").replace(/"/g, '%22').replace(/'/g, '%27').replace(/\?/g, '%3F').replace(/\&/g, '%26').replace(/\+/g, '%2B') : pString;
 	}
-	
+
 	// UpperCaseFirstLetter
 	static ucfirst(s:string) : string { return s && s[0].toUpperCase() + s.slice(1); }
-	
+
 	/***************************
 	* Array Helpers
 	***************************/
@@ -203,7 +203,21 @@ export default class Utils
 		}
 		return out;
 	}
-	
+
+	// Will filter out elements from an array using predicate function
+	static filterArray<T>(a:T[], pFunc:(o:T)=>boolean) : T[] {
+		var out:any[] = [];
+		var len:number = a.length;
+		var j:number = 0;
+		for(var i = 0; i < len; i++) {
+			var item:any = a[i];
+			if(pFunc(item)) {
+				out[j] = item;
+			}
+		}
+		return out;
+	}
+
 	static removeFromArray<T>(pArray:T[], pData:T) : T|null {
 		let i = pArray.indexOf(pData);
 		if(i != -1) {
@@ -211,14 +225,14 @@ export default class Utils
 		}
 		return null;
 	}
-	
+
 	static arrayFind<T>(pArray:T[], pFunc:(o:T)=>boolean) : T|null {
 		for (var i = 0; i < pArray.length; ++i) {
 			if(pFunc(pArray[i])) { return pArray[i]; }
 		}
 		return null;
 	}
-	
+
 	/**
 	 * Returns an array with arrays of the given size.
 	 *
@@ -227,27 +241,27 @@ export default class Utils
 	 */
 	 static chunkArray<T>(myArray:T[], chunk_size:number) : T[][] {
 		var index = 0, arrayLength = myArray.length, chunkedArray:T[][] = [];
-		
+
 		for (index = 0; index < arrayLength; index += chunk_size) {
 			chunkedArray.push( myArray.slice(index, index+chunk_size) );
 		}
 
 		return chunkedArray;
 	}
-	
+
 	/***************************
 	* Misc Methods
 	***************************/
-	
+
 	static uniqID() : string {
 		return "id"+(++Global.uniqID);
 	}
-	
+
 	static getFirstItemFromObject(pData:any) : any {
 		for(var tKey in pData)
 		return pData[tKey];
 	}
-	
+
 	// { foo=1, bar=2 } -> "foo=1&bar=2"
 	static objectToUrlQueryData(data:any) : string {
 		const ret:string[] = [];
@@ -256,7 +270,7 @@ export default class Utils
 		}
 		return ret.join('&');
 	}
-	
+
 	// Assumes the file has already been checked to be in namespace 6
 	static isFileAudio(pTitle:string) : boolean {
 		var tExt:string, audioExtensions = ["oga", "ogg", "ogv"]; // Audio extensions allowed by Wikia
@@ -266,7 +280,7 @@ export default class Utils
 		}
 		return false;
 	}
-	
+
 	// Makes log-friendly urls (changes format and encodes data to make them link properly)
 	static logUrl(pPrefix:string, pUrl:string, ...args:any[]) : void {
 		let [start, ...vars] = pUrl.replace("&format=json", "&format=jsonfm").split(/\?|\&/);
@@ -274,7 +288,7 @@ export default class Utils
 		// vars = vars.map(s=>(([p,d])=>`${p}=${encodeURIComponent(d)}`)(s.split("=")))
 		mw.log(pPrefix, `${start}?${vars.join("&")}`, ...args);
 	}
-	
+
 	// http://phpjs.org/functions/version_compare/
 	// Simulate PHP version_compare
 	static version_compare(v1Arg:string|number, v2Arg:string|number, operator:string) : string|null {
@@ -319,7 +333,7 @@ export default class Utils
 			else if (v1[i] > v2[i]) { compare = 1; break; }
 		}
 		if (!operator) { return compare.toString(); }
-		
+
 		switch (operator) {
 			case '>': case 'gt':			{ return (compare > 0).toString(); }
 			case '>=': case 'ge':			{ return (compare >= 0).toString(); }
