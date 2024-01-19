@@ -20,7 +20,7 @@ export default class RCMManager
 {
 	// Static Constants
 	static LOADING_ERROR_RETRY_NUM_INC : number = 5;
-	
+
 	// Storage
 	/***************************
 	 * HTML Elements/Nodes
@@ -32,28 +32,28 @@ export default class RCMManager
 	wikisNode		: RCMWikiPanel;
 	resultsNode		: HTMLElement;
 	footerNode		: HTMLElement;
-	
+
 	rcmNewChangesMarker		: HTMLElement|null;
 	rcmNoNewChangesMarker	: HTMLElement|null;
-	
+
 	/***************************
 	 * Data provided to script
 	 ***************************/
 	rcParamsBase			: Partial<RCParams>; // An object containing data about the RecentChange "params" sent in
 	rcParams				: RCParams; // Same as rcParamsBase as well as default values if not supplied
-	
+
 	autoRefreshTimeoutNum	: number // Number of milliseconds to wait before refreshing
-	
+
 	chosenWikis				: WikiData[]; // Wikis for the script to load
 	hideusers				: string[]; // List of users to hide across whole RCMManager
 	onlyshowusers			: string[]; // Only show these users' edits across whole RCMManager
 	notificationsHideusers	: string[]; // Don't send notifications when these users edit.
-	
+
 	makeLinksAjax			: boolean; // Make the diff/gallery link behave as the ajax icons do.
 	discNamespaces			: { FORUM:boolean, WALL:boolean, ARTICLE_COMMENT:boolean }; // What discussion namespaces (container types) to show
 	discussionsEnabled		: boolean; // Whether to load Wikia discussions
 	abuseLogsEnabled		: boolean; // Whether to allow wikis to load abuse filter logs (if wiki has them)
-	
+
 	/***************************
 	 * Storage
 	 ***************************/
@@ -62,43 +62,43 @@ export default class RCMManager
 	autoRefreshEnabledDefault	: boolean; // Default value for auto refresh being enabled.
 	autoRefreshEvenOnFocus		: boolean; // Whether or not script should keep auto refreshing even when page has focus.
 	autoRefreshLocalStorageID	: string;
-	
+
 	rcData						: { data:RCData, list?:RCList }[];
 	recentChangesEntries		: RCList[]; // Array of either RecentChange/RecentChangeList objects.
 	newRecentChangesEntries		: RCList[]; // Only the new / "dirty" RCLists
-	
+
 	extraLoadingEnabled			: boolean; // Turns extra loading on/off
 	secondaryWikiData			: { url:string|(()=>string), callback:(...params)=>void, dataType?:string, skipRefreshSanity?:boolean }[]; // Array of objects that are used to fill in blanks that cannot be retrieved on initial data calls (usually page-specific).
-	
+
 	currentMultiLoader			: MultiLoader<WikiData>; // Current multiLoader - needed encase errored wikis need to be retried
 	flagWikiDataIsLoaded		: boolean; // Make sure certain actions can't be done by user until wiki data is retrieved.
 	loadErrorTimeoutID			: number;
-	
+
 	itemsAdded					: number; // Number off items added to screen AFTER load.
 	itemsToAddTotal				: number; // Total number if items to add to the screen
 	isHardRefresh				: boolean;
-	
+
 	lastLoadDateTime			: Date|null; // The last time everything was loaded. This is also updated if window regains focus.
 	lastLoadDateTimeActual		: Date|null; // Even if lastLoadDateTime hasn't been updated (due to auto refresh), this always has the actual last loaded date
-	
+
 	// Constructor
 	constructor(pWrapper:HTMLElement|Element, pModID:string|number) {
 		this.modID			= "rcm"+pModID;
 		this.resultCont		= <HTMLElement>pWrapper;
-		
+
 		this.makeLinksAjax				= false;
 		this.ajaxID						= 0;
 		this.autoRefreshLocalStorageID	= Global.AUTO_REFRESH_LOCAL_STORAGE_ID + "-" + this.modID;
 		this.extraLoadingEnabled		= true;
 		this.flagWikiDataIsLoaded		= false;
 		this.isHardRefresh				= true;
-		
+
 		this._parseWikiList();
-		
+
 		// Setup initial loading view
 		this.resultCont.innerHTML = `<center>${Global.getLoaderLarge()}</center>`;
 	}
-	
+
 	// dispose() : void {
 	// 	this.resultCont		= null;
 	// 	this.optionsNode.dispose();
@@ -108,13 +108,13 @@ export default class RCMManager
 	// 	this.wikisNode		= null;
 	// 	this.resultsNode	= null;
 	// 	this.footerNode		= null;
-		
+
 	// 	this.rcmNewChangesMarker		= null;
 	// 	this.rcmNoNewChangesMarker		= null;
-		
+
 	// 	this.hideusers		= null;
 	// 	this.onlyshowusers	= null;
-		
+
 	// 	this.rcData = null;
 	// 	this.newRecentChangesEntries = null;
 	// 	if(this.recentChangesEntries) {
@@ -125,24 +125,24 @@ export default class RCMManager
 	// 		this.recentChangesEntries = null;
 	// 	}
 	// 	this.secondaryWikiData	= null;
-		
+
 	// 	this.lastLoadDateTime	= null;
 	// };
-	
+
 	// Should only be called once per RCMManager.
 	private _parseWikiList() : void {
 		/***************************
 		* Data provided to script
 		***************************/
 		var tDataset = this.resultCont.dataset;
-		
+
 		this.rcParamsBase = $.extend( {}, Main.rcParamsURL, this.parseRCParams(tDataset.params, "&", "=") );
 		this.rcParams = $.extend( this.getDefaultRCParams(), this.rcParamsBase );
-		
+
 		this.autoRefreshEnabledDefault = tDataset.autorefreshEnabled == "true" ? true : false;
 		this.autoRefreshTimeoutNum = (tDataset.autorefresh ? parseInt(tDataset.autorefresh) : 60) * 1000; // {int} number of milliseconds to wait before refreshing.
 		this.autoRefreshEvenOnFocus = tDataset.autorefreshEvenonfocus == "false" ? false : true;
-		
+
 		// Check discussion / social activity related fields
 		const socialStatus = tDataset.discussionsEnabled;
 		const socialEnabled = this.discussionsEnabled = socialStatus !== "false";
@@ -154,30 +154,32 @@ export default class RCMManager
 			this.discNamespaces.WALL = dns.indexOf("WALL") != -1;
 			this.discNamespaces.ARTICLE_COMMENT = dns.indexOf("ARTICLE_COMMENT") != -1;
 		}
-		
+
 		this.abuseLogsEnabled = tDataset.abuselogsEnabled == "true";
-		
+
 		const splitNames = (str?:string) => str?.replace(/_/g, " ").split(",") ?? [];
 		const sanitiseNames = user => Utils.ucfirst(user.trim());
-		
+
 		// List of users to hide across whole RCMManager
 		this.hideusers = splitNames(tDataset.hideusers).map(sanitiseNames);
 		this.notificationsHideusers = splitNames(tDataset.notificationsHideusers).map(sanitiseNames);
-		
+
 		// Only show these users' edits across whole RCMManager
 		this.onlyshowusers = splitNames(tDataset.onlyshowusers).map(sanitiseNames);
-		
+
 		this.extraLoadingEnabled = tDataset.extraLoadingEnabled == "false" ? false : true;
 		this.makeLinksAjax = tDataset.ajaxlinks == "true" ? true : false;
-		
+
 		// Wikis for the script to load
 		this.chosenWikis = $(this.resultCont).find(">ul>li").toArray().map((pNode)=>new WikiData(this).initListData(pNode));
 		// Remove duplicates
 		this.chosenWikis = Utils.uniq_fast_key(this.chosenWikis, "scriptpath"); //todo - mke sure this now also checks /fr/ and such
-		
+		// Filter not allowed wikis
+		this.chosenWikis = Utils.filterArray(this.chosenWikis, w=>w.isWikiaWiki);
+
 		this.resultCont.innerHTML = "";
 	}
-	
+
 	// Adds core elements. Should only be called once per RCMManager.
 	init() : RCMManager {
 		this.resultCont.innerHTML = "";
@@ -185,7 +187,7 @@ export default class RCMManager
 		this.modID = "."+this.modID;
 		this.rcData = [];
 		this.recentChangesEntries = [];
-		
+
 		/***************************
 		* HTML Elements/Nodes
 		***************************/
@@ -195,26 +197,26 @@ export default class RCMManager
 		Global.showUpdateMessage(this.resultCont);
 		this.resultsNode	= Utils.newElement("div", { className:"rcm-results rc-conntent" }, this.resultCont);
 		this.footerNode		= Utils.newElement("div", { className:"rcm-footer" }, this.resultCont);
-		
+
 		/***************************
 		* Setup
 		***************************/
 		// Footer never changes, so set here
 		let tEndNewMessageDate = new Date(Global.lastVersionDateString); tEndNewMessageDate.setDate(tEndNewMessageDate.getDate() + 3);
 		let tNewVersion = tEndNewMessageDate > new Date() ? '<sup class="rcm-new-version">'+i18n("notification-new")+'</sup>' : "";
-		
+
 		this.footerNode.innerHTML = "[<a href='//dev.fandom.com/wiki/RecentChangesMultiple'>RecentChangesMultiple</a>] " + i18n('footer', "[https://github.com/fewfre/RecentChangesMultiple/blob/master/changelog "+Global.version+"]VERSION", "REPLACE")
 			.replace("VERSION", tNewVersion)
 			.replace("REPLACE", `<img src='https://fewfre.com/images/avatar.jpg?tag=rcm&pref=${encodeURIComponent(window.location.href.split("#")[0])}' width='14' height='14' /> <a href='https://fewfre.fandom.com/wiki/Fewfre_Wiki'>Fewfre</a>`);
-		
+
 		$( this.resultsNode ).on("click", ".rcm-favicon-goto-button", this.wikisNode.goToAndOpenInfo);
-		
+
 		// Now start the app
 		this._startWikiDataLoad();
-		
+
 		return this;
 	};
-	
+
 	/***************************
 	* Loading - Shared
 	***************************/
@@ -228,26 +230,26 @@ export default class RCMManager
 			this.statusNode.querySelector(".errored-wiki")!.innerHTML += ", "+pWikiData.servername;
 		}
 	}
-	
+
 	private setupStatusLoadingMode(loadingText:I18nKey) : void {
 		this.statusNode.innerHTML = [
 			`<div class="rcm-status-alerts-cont"></div>`,
 			`<div class="rcm-status-loading-cont">${Global.getLoader()} ${i18n(loadingText)} (<span class='rcm-load-perc'>0%</span>)</div>`,
 		].join("");
 	}
-	
+
 	// Expects a whole number between 0-100
 	private _updateLoadingPercent=(perc:number)=>{
 		$(this.modID+" .rcm-load-perc").html(`${perc}%`);//.toFixed(3) + "%";
 	}
-	
+
 	/***************************
 	* Setup WikiData classes - Various wiki data needs to be loaded before the script can properly run.
 	* These should only be called at the begining of the script; once data is retrieved, does not need to be loaded again.
 	***************************/
 	private _startWikiDataLoad() : void {
 		this.ajaxID++;
-		
+
 		if(this.chosenWikis.length > 0) {
 			this.setupStatusLoadingMode('status-loading');
 			this._loadWikiDataFromList(this.chosenWikis);
@@ -258,7 +260,7 @@ export default class RCMManager
 			this.resultsNode.innerHTML = `<div class='banner-notification error center'>${i18n("expand_templates_input_missing")}</div>`;
 		}
 	}
-	
+
 	private _loadWikiDataFromList(list:WikiData[]) : void {
 		const loader = this.currentMultiLoader = new MultiLoader<WikiData>(this);
 		loader.multiLoad({
@@ -302,7 +304,7 @@ export default class RCMManager
 		})
 		.then(this._onAllWikiDataParsed);
 	}
-	
+
 	private _handleWikiDataLoadError=(pWikiData:WikiData, pTries:number, pID:number, pErrorMessage:I18nKey, pInc:number) : void => {
 		const errorCont = $("<div>").appendTo($(this.statusNode).find(".rcm-status-alerts-cont"));
 		let string = `<div class='rcm-error'>${i18n(pErrorMessage, `[<span class='errored-wiki'>${mw.html.escape(pWikiData.servername)}</span>]`, pTries)}</div>`;
@@ -310,7 +312,7 @@ export default class RCMManager
 			string += `<div class='rcm-error'>${i18n("error-loading-http")}</div>`;
 		}
 		errorCont.html(string);
-		
+
 		// Retry Button
 		$(`<button class="rcm-btn">${i18n("error-trymoretimes", pInc)}</button>`).appendTo(errorCont).on("click", ()=>{
 			this.currentMultiLoader.retry(pInc);
@@ -327,35 +329,35 @@ export default class RCMManager
 			errorCont.remove();
 		});
 	}
-	
+
 	// Should only be called once.
 	private _onAllWikiDataParsed=() : void => {
 		this.flagWikiDataIsLoaded = true;
 		// Add some run-time CSS classes
 		mw.util.addCSS( this.chosenWikis.map(w=>w.getWikiRuntimeCSS()).join('\n') );
-		
+
 		// Update wiki section now that everything is loaded
 		this.wikisNode.onWikiDataLoaded();
-		
+
 		// If at least one wiki on this list has abuse filters enabled, then show the toggle
 		this.optionsNode.toggleAbuseLogsFilterVisiblity( this.chosenWikis.some(w=>w.wikiUsesAbuseLogs) );
-		
+
 		this._start(true);
 	}
-	
+
 	/***************************
 	* Main manager state methods
 	***************************/
 	private _start(pUpdateParams:boolean=false) : void {
 		clearTimeout(this.autoRefreshTimeoutID);
 		this.wikisNode.clear();
-		
+
 		this.newRecentChangesEntries = [];
 		this.secondaryWikiData = [];
-		
+
 		this.ajaxID++;
 		this.itemsAdded = this.itemsToAddTotal = 0;
-		
+
 		const wikis = this.chosenWikis.filter(w=>!w.hidden);
 		// This happens if someone hides all wikis
 		if(wikis.length == 0) {
@@ -363,31 +365,31 @@ export default class RCMManager
 			this.wikisNode.refresh();
 			return;
 		}
-		
+
 		if(pUpdateParams) {
 			wikis.forEach(wiki => wiki.setupRcParams());
 		}
-		
+
 		this.setupStatusLoadingMode('status-loading-sorting');
-		
+
 		this._loadRecentChangesFromList(wikis);
 	}
-	
+
 	// Refresh and add new changes to top
 	refresh(pUpdateParams:boolean=false) : void {
 		if(this.chosenWikis.length == 0 || !this.flagWikiDataIsLoaded) { return; }
 		this.isHardRefresh = false;
 		this.statusNode.innerHTML = "";
 		// this.resultsNode.innerHTML = "";
-		
+
 		// Remove except if auto refresh is on, window doesn't have focus, and the window wasn't clicked and then lost focus again (by checking lastLoadDateTime)
 		if(this.rcmNewChangesMarker && (!this.isAutoRefreshEnabled() || (document.hasFocus() || this.lastLoadDateTime! >= this.recentChangesEntries[0].date))) {
 			Utils.removeElement(this.rcmNewChangesMarker);
 			this.rcmNewChangesMarker = null;
 		}
-		
+
 		if(this.rcmNoNewChangesMarker) { Utils.removeElement(this.rcmNoNewChangesMarker); this.rcmNoNewChangesMarker = null; }
-		
+
 		// if(this.recentChangesEntries != null) {
 		// 	for (var i = 0; i < this.recentChangesEntries.length; i++) {
 		// 		this.recentChangesEntries[i].dispose();
@@ -395,12 +397,12 @@ export default class RCMManager
 		// 	}
 		// 	this.recentChangesEntries = null;
 		// }
-		
+
 		RCMModal.closeModal();
-		
+
 		this._start(pUpdateParams);
 	}
-	
+
 	// Refresh and fetch all data again.
 	hardRefresh(pUpdateParams:boolean=false) : void {
 		if(this.chosenWikis.length == 0 || !this.flagWikiDataIsLoaded) { return; }
@@ -409,7 +411,7 @@ export default class RCMManager
 		this.resultsNode.innerHTML = "";
 		this.rcmNewChangesMarker = null;
 		this.rcmNoNewChangesMarker = null;
-		
+
 		this.chosenWikis.forEach((tWikiData:WikiData) => {
 			tWikiData.lastChangeDate = tWikiData.getEndDate();
 			tWikiData.lastDiscussionDate = tWikiData.getEndDate();
@@ -420,7 +422,7 @@ export default class RCMManager
 			// Need to clear them as otherwise they won't be attempted again
 			tWikiData.discCommentPageNamesNeeded = [];
 		});
-		
+
 		// if(this.rcData != null) {
 		// 	for (var i = 0; i < this.rcData.length; i++) {
 		// 		this.rcData[i].list.dispose();
@@ -428,9 +430,9 @@ export default class RCMManager
 		// 	}
 		// 	this.rcData = null;
 		// }
-		
+
 		this.rcData = [];
-		
+
 		if(this.recentChangesEntries != null) {
 			for (var i = 0; i < this.recentChangesEntries.length; i++) {
 				this.recentChangesEntries[i].dispose();
@@ -439,18 +441,18 @@ export default class RCMManager
 			}
 		}
 		this.recentChangesEntries = [];
-		
+
 		RCMModal.closeModal();
-		
+
 		this._start(pUpdateParams);
 	}
-	
+
 	/***************************
 	* Discussion Loading
 	***************************/
 	private _startDiscussionLoading(pID:number) : void {
 		if(!this.discussionsEnabled) { return; }
-		
+
 		const wikis = this.chosenWikis.filter(w=>!w.hidden).filter(w=>w.usesWikiaDiscussions !== false);
 		// If no discussions are being loaded, skip it and tell manager to not even bother in the future.
 		if(wikis.length <= 0) {
@@ -458,11 +460,11 @@ export default class RCMManager
 			this.rcmChunkStart();
 			return;
 		}
-		
+
 		this.setupStatusLoadingMode('status-discussions-loading');
 		this._loadDiscussionsFromList(wikis);
 	}
-	
+
 	private _loadDiscussionsFromList(list:WikiData[]) : void {
 		const loader = this.currentMultiLoader = new MultiLoader<WikiData>(this);
 		loader.multiLoad({
@@ -473,7 +475,7 @@ export default class RCMManager
 			onProgress: this._updateLoadingPercent,
 			onSingleLoadFinished: (data, wikiData)=>{
 				if(data && data.warning) { mw.log("WARNING: ", data.warning); }
-				
+
 				// Make sure it wasn't disabled during validity check
 				if(wikiData.usesWikiaDiscussions !== false) {
 					// If success, then we know this wiki uses discussions!
@@ -517,13 +519,13 @@ export default class RCMManager
 		})
 		.then(this._onAllDiscussionsParsed);
 	}
-	
+
 	private _parseWikiDiscussions(pData:any[], pWikiData:WikiData) : void {
 		// Check if wiki doesn't have any recent changes
 		if(!pData || pData.length <= 0) {
 			return;
 		}
-		
+
 		// A sort is needed since they are sorted by creation, not last edit.
 		pData.sort((a, b) => {
 			return (a.modificationDate || a.creationDate).epochSecond < (b.modificationDate || b.creationDate).epochSecond ? 1 : -1;
@@ -538,26 +540,26 @@ export default class RCMManager
 			try {
 				// Skip if goes past the RC "changes in last _ days" value.
 				if((pRCData.modificationDate || pRCData.creationDate).epochSecond < Math.round(pWikiData.getEndDate().getTime() / 1000)) { return; }
-				
+
 				// Skip if discussion type is one user doesn't want
 				const containerType = pRCData._embedded.thread[0].containerType;
 				if(!this.discNamespaces[ containerType ]) { return; }
 			} catch(e){}
-			
+
 			/////// Create RC ///////
 			this.itemsToAddTotal++;
 			tNewRC = new RCDataFandomDiscussion(pWikiData, this, pRCData);
 			this._addRCDataToList(tNewRC);
 			pWikiData.discussionsCount++;
 		});
-		
+
 		mw.log("Discussions:", pWikiData.servername, pData);
 	}
-	
+
 	private _onAllDiscussionsParsed=() : void => {
 		this.rcmChunkStart();
 	}
-	
+
 	/***************************
 	* Main RecentChanges loading methods
 	***************************/
@@ -608,44 +610,44 @@ export default class RCMManager
 		})
 		.then(this._onAllWikisParsed);
 	}
-	
+
 	private _handleWikiLoadError=(pWikiData:WikiData, pTries:number, pID:number, pErrorMessage:I18nKey, pInc:number) : void => {
 		clearTimeout(this.loadErrorTimeoutID); this.loadErrorTimeoutID = 0;
-		
+
 		const errorCont = $("<div>").appendTo($(this.statusNode).find(".rcm-status-alerts-cont"));
 		errorCont.html(`<div class='rcm-error'>${i18n(pErrorMessage, `[<span class='errored-wiki'>${mw.html.escape(pWikiData.servername)}</span>]`, pTries)}</div>`);
-		
+
 		this.addRefreshButtonTo(errorCont[0]);
 		errorCont.append(" ");
-		
+
 		// Retry Button
 		const retry = ()=>{
 			clearTimeout(this.loadErrorTimeoutID); this.loadErrorTimeoutID = 0;
-			
+
 			this.currentMultiLoader.retry(pInc);
 			errorCont.remove();
 		};
 		$(`<button class="rcm-btn">${i18n("error-trymoretimes", pInc)}</button>`).appendTo(errorCont).on("click", retry);
-		
+
 		if(this.isAutoRefreshEnabled()) { this.loadErrorTimeoutID = window.setTimeout(() => { retry?.(); }, 20000); }
 	}
-	
+
 	/* Check wiki data one at a time, either as it's returned, or after the current data is done being processed. */
 	private _parseWiki(pData, pWikiData:WikiData) : void {
 		// Check if wiki doesn't have any recent changes
 		if(!pData || pData.length <= 0) {
 			return;
 		}
-		
+
 		mw.log(pWikiData.servername, pData);
-		
+
 		pWikiData.updateLastChangeDate(Utils.getFirstItemFromObject(pData));
 		let tNewRC;
 		// Add each entry from the wiki to the list in a sorted order
 		pData.forEach((pRCData) => {
 			const userEdited = pData.user != "" && pData.anon != "";
 			if(this._changeShouldBePrunedBasedOnOptions(pRCData.user, userEdited, pWikiData)) { return; }
-			
+
 			this.itemsToAddTotal++;
 			if(pRCData.logtype && pRCData.logtype != "0") { // It's a "real" log. "0" signifies a wall/board.)
 				tNewRC = new RCDataLog(pWikiData, this, pRCData);
@@ -656,26 +658,26 @@ export default class RCMManager
 			pWikiData.resultsCount++;
 		});
 	};
-	
+
 	private _parseWikiAbuseLog(pLogs, pWikiData:WikiData) : void {
 		// Check if wiki doesn't have any abuse logs
 		if(!pLogs || pLogs.length <= 0) {
 			return;
 		}
-		
+
 		pWikiData.updateLastAbuseLogDate(Utils.getFirstItemFromObject(pLogs));
 		// Add each entry from the wiki to the list in a sorted order
 		pLogs.forEach((pLogData) => {
 			pLogData = RCDataLog.abuseLogDataToNormalLogFormat(pLogData);
 			const userEdited = pLogData.anon != "";
 			if(this._changeShouldBePrunedBasedOnOptions(pLogData.user, userEdited, pWikiData)) { return; }
-			
+
 			this.itemsToAddTotal++;
 			this._addRCDataToList( new RCDataLog(pWikiData, this, pLogData) );
 			pWikiData.abuseLogCount++;
 		});
 	}
-	
+
 	private _onAllWikisParsed=() : void => {
 		if(this.discussionsEnabled) {
 			this._startDiscussionLoading(this.ajaxID);
@@ -683,7 +685,7 @@ export default class RCMManager
 			this.rcmChunkStart();
 		}
 	}
-	
+
 	/***************************
 	* General RCData Management methods
 	***************************/
@@ -695,20 +697,20 @@ export default class RCMManager
 		// Skip if user is NOT a specified user to show for whole script or specific wiki
 		if(pUser && (this.onlyshowusers.length != 0 && this.onlyshowusers.indexOf(pUser) == -1)) { return true; }
 		if(pUser && (pWikiData.onlyshowusers != undefined && pWikiData.onlyshowusers.indexOf(pUser) == -1)) { return true; }
-		
+
 		// Skip if anon post && we don't want anon
 		if(pWikiData.rcParams.hideanons && !pUserEdited) { return true; }
 		// Skip if user post && we don't want user posts
 		else if(pWikiData.rcParams.hideliu && pUserEdited) { return true; }
-		
+
 		return false;
 	}
-	
+
 	// TODO: Make it more efficient if using hideenhanced by ignoring some calls.
 	private _addRCDataToList(pNewRC:RCData) : void {
 		let tNewRcCombo:{ data:RCData, list?:RCList } = { data:pNewRC };
 		this.rcData.push( tNewRcCombo ); // Just push it in, we'll sort it in rcmChunkStart use array.sort (less intensive than doing it manually).
-		
+
 		let tResultsIsEmpty = this.resultsNode.innerHTML == "", tNewList:RCList|undefined, tNoChangeAdded:boolean;
 		if(this.rcParams.hideenhanced) {
 			tNoChangeAdded = true; // No reason to do fancy stuff, we'll just call array.sort in rcmChunkStart
@@ -767,7 +769,7 @@ export default class RCMManager
 		}
 		tNewRcCombo.list = tNewList;
 	}
-	
+
 	/***************************
 	* Display Results
 	***************************/
@@ -776,13 +778,13 @@ export default class RCMManager
 		let tDate:Date = new Date();
 		this.statusNode.innerHTML = i18n('status-timestamp', "<b><tt>"+Utils.pad(Utils.getHours(tDate),2)+":"+Utils.pad(Utils.getMinutes(tDate),2)+"</tt></b>");
 		this.statusNode.innerHTML += "<span class='rcm-content-loading'> – ["+i18n('status-changesadded', "<span class='rcm-content-loading-num'>0</span> / "+this.itemsToAddTotal)+"]</span>"
-		
+
 		// Using array sort after as it's more efficient than doing it manually.
 		this.rcData.sort((a, b) => { return b.data.date.valueOf() - a.data.date.valueOf(); });
 		if(this.rcParams.hideenhanced) { this.recentChangesEntries.sort((a, b) => { return b.date.valueOf() - a.date.valueOf(); }); }
-		
+
 		this.removeOldResults(tDate);
-		
+
 		// New changes to add to page
 		this.newRecentChangesEntries = [];
 		let tResultsIsEmpty = this.resultsNode.innerHTML == "";
@@ -793,16 +795,16 @@ export default class RCMManager
 			}
 			return false;
 		});
-		
+
 		// Remove except if auto refresh is on, window doesn't have focus, and the window wasn't clicked and then lost focus again (by checking lastLoadDateTime)
 		// if(this.rcmNewChangesMarker && (!this.isAutoRefreshEnabled() || (document.hasFocus() || this.recentChangesEntries[0].date < this.lastLoadDateTime))) {
 		// 	Utils.removeElement(this.rcmNewChangesMarker);
 		// 	this.rcmNewChangesMarker = null;
 		// }
-		
+
 		// Remove this before laoding starts.
 		// if(this.rcmNoNewChangesMarker) { Utils.removeElement(this.rcmNoNewChangesMarker); this.rcmNoNewChangesMarker = null; }
-		
+
 		if(this.recentChangesEntries.length == 0 || (this.lastLoadDateTime != null && this.recentChangesEntries[0].date <= this.lastLoadDateTime)) {
 			if(!this.rcmNewChangesMarker) this.rcmNoNewChangesMarker = <HTMLElement>this.resultsNode.insertBefore(Utils.newElement("div", { className:"rcm-noNewChanges", innerHTML:"<strong>"+i18n('nonewchanges')+"</strong>" }), this.resultsNode.firstChild);
 		}
@@ -811,7 +813,7 @@ export default class RCMManager
 				let tRcSection = this.resultsNode.querySelector("div, ul")!;
 				this.rcmNewChangesMarker = <HTMLElement>tRcSection.insertBefore(Utils.newElement("div", { className:"rcm-previouslyLoaded", innerHTML:"<strong>"+i18n('previouslyloaded')+"</strong>" }), tRcSection.firstChild);
 			}
-			
+
 			if(this.lastLoadDateTimeActual != null && this.isAutoRefreshEnabled() && !document.hasFocus()) {
 				if(this.recentChangesEntries[0].date > this.lastLoadDateTimeActual) {
 					this.notifyUserOfChange();
@@ -838,7 +840,7 @@ export default class RCMManager
 	// 	}
 	// 	this.rcmChunk(0, 99, 99, null, this.ajaxID);
 	// }
-	
+
 	// Remove old items past "limit" and "days"
 	// All need to be looped through since grouped changes can cause older results to be at the top.
 	removeOldResults(pDate:Date) : void {
@@ -873,7 +875,7 @@ export default class RCMManager
 				if(tWikisToCheck.length == 0) { break; }
 			}
 		}
-		
+
 		// Now remove or update dirty lists.
 		let tOldNode:HTMLElement, tListI:number;
 		tDirtyLists.forEach((pRCList:RCList) => {
@@ -894,7 +896,7 @@ export default class RCMManager
 				console.warn("[RCMManager](removeOldResults) Failed to remove old list.");
 			}
 		});
-		
+
 		// If there are any blank rc sections left over from removed items, remove them.
 		Utils.forEach(this.resultsNode.querySelectorAll(".rcm-rc-cont"), (o) => {
 			if(o.innerHTML == "") {
@@ -902,9 +904,9 @@ export default class RCMManager
 				Utils.removeElement(o);
 			}
 		});
-		
-		
-		
+
+
+
 		// // First remove items past "days" (needs to be done first since it can change number allowed by "limit")
 		// let tRCList:RCList, tNewRCList:RCList, tOldNode:HTMLElement, tDirty:boolean;
 		// for(let i = this.recentChangesEntries.length-1; i >= 0; i--) { tRCList = this.recentChangesEntries[i];
@@ -939,7 +941,7 @@ export default class RCMManager
 		// }
 		// tRCList = null; tNewRCList = null; tOldNode = null;
 	}
-	
+
 	notifyUserOfChange() {
 		let tMostRecentEntry = this.recentChangesEntries[0].newest;
 		// Skip if user is hidden for whole script or specific wiki
@@ -959,25 +961,25 @@ export default class RCMManager
 			}
 			Main.blinkWindowTitle(i18n("notification-new")+" "+i18n("nchanges", tNumNewChanges));
 			let tEditTitle = tMostRecentEntry.getNotificationTitle();
-			
+
 			// Get each line of the notification
 			let bodyContents:string[] = [];
 			if(tEditTitle) bodyContents.push(tEditTitle);
 			bodyContents.push( i18n("notification-edited-by", tMostRecentEntry.author) );
 			if(tMostRecentEntry.summaryUnparsed) bodyContents.push( i18n("notification-edit-summary", tMostRecentEntry.summaryUnparsed) );
-			
+
 			Main.addNotification(i18n("nchanges", tNumNewChanges)+" - "+tMostRecentEntry.wikiInfo.sitename + (tNumNewChangesWiki != tNumNewChanges ? ` (${tNumNewChangesWiki})` : ""), {
 				body: bodyContents.join("\n")
 			});
 		}
 	}
-	
+
 	// Add a single change at a time, with a timeout before the next one to prevents script from locking up browser.
 	rcmChunk(pIndex:number, pLastDay:number, pLastMonth:number, pContainer:HTMLElement|undefined, pID:number) : void {
 		if(pID != this.ajaxID) { return; } // If the script is refreshed (by auto refresh) while entries are adding, stop adding old entries.
-		
+
 		if(this.newRecentChangesEntries.length == 0) { this.finishScript(); return; }
-		
+
 		let date = this.newRecentChangesEntries[pIndex].date, tAddToTopOfExistingContainer = false;
 		// Add new date grouping if necessary.
 		if(Utils.getDate(date) != pLastDay || Utils.getMonth(date) != pLastMonth || !pContainer) { // !pContainer check is because we let it be undefined for the first time it's called
@@ -1015,7 +1017,7 @@ export default class RCMManager
 		// if(this.lastLoadDateTime != null && pIndex-1 >= 0 && date <= this.lastLoadDateTime && this.newRecentChangesEntries[pIndex-1].date > this.lastLoadDateTime) {
 		// 	this.rcmNewChangesMarker = Utils.newElement("div", { className:"rcm-previouslyLoaded", innerHTML:"<strong>"+i18n('previouslyloaded')+"</strong>" }, pContainer);
 		// }
-		
+
 		// Add to page
 		if(this.rcmNewChangesMarker) {
 			if(this.newRecentChangesEntries[pIndex].htmlNode) { Utils.removeElement(this.newRecentChangesEntries[pIndex].htmlNode); }
@@ -1038,7 +1040,7 @@ export default class RCMManager
 			pContainer.appendChild(this.newRecentChangesEntries[pIndex].toHTML(pIndex));
 		}
 		this.itemsAdded += this.newRecentChangesEntries[pIndex].list.length;
-		
+
 		if(++pIndex < this.newRecentChangesEntries.length) {
 			$(this.modID+" .rcm-content-loading-num").html( this.itemsAdded.toString() );
 			// Only do a timeout every few changes (timeout is to prevent browser potentially locking up, only every few to prevent it taking longer than necessary)
@@ -1050,7 +1052,7 @@ export default class RCMManager
 		}
 		else { this.finishScript(); }
 	};
-	
+
 	// // Add a single change at a time, with a timeout before the next one to prevents script from locking up browser.
 	// rcmChunkOld(pIndex:number, pLastDay:number, pLastMonth:number, pContainer:HTMLElement, pID:number) : void {
 	// 	if(pID != this.ajaxID) { return; } // If the script is refreshed (by auto refresh) while entries are adding, stop adding old entries.
@@ -1086,7 +1088,7 @@ export default class RCMManager
 	// 	}
 	// 	else { this.finishScript(); }
 	// };
-	
+
 	finishScript() : void {
 		Utils.removeElement(document.querySelector(this.modID+" .rcm-content-loading"));
 		this.addRefreshButtonTo(this.statusNode);
@@ -1096,45 +1098,45 @@ export default class RCMManager
 			this.lastLoadDateTime = this.recentChangesEntries.length > 0 ? this.recentChangesEntries[0].date : null;//new Date();
 		}
 		this.lastLoadDateTimeActual = this.recentChangesEntries.length > 0 ? this.recentChangesEntries[0].date : null;//new Date();
-		
+
 		// Removing this all remove event handlers
 		// for (var i = 0; i < this.recentChangesEntries.length; i++) {
 		// 	this.recentChangesEntries[i].dispose();
 		// 	this.recentChangesEntries[i] = null;
 		// }
 		// this.recentChangesEntries = null;
-		
+
 		this.startAutoRefresh();
-		
+
 		//$( "#rc-content-multiple .mw-collapsible" ).each(function(){ $(this).makeCollapsible(); });
-		
+
 		(window.ajaxCallAgain || []).forEach((cb) => { cb(); });
-		
+
 		// Secondary info
 		if(this.extraLoadingEnabled) {
 			// Check here instead of adding as they come up to condense calls.
 			this.chosenWikis.forEach(function(wd){ wd.checkForSecondaryLoading(); });
-			
+
 			this._loadExtraInfo(this.ajaxID);
 		}
 	};
-	
+
 	startAutoRefresh() : void {
 		if(!this.isAutoRefreshEnabled()) { return; }
-		
+
 		this.autoRefreshTimeoutID = window.setTimeout(() => {
 			if(RCMModal.isModalOpen() || (this.autoRefreshEvenOnFocus == false && document.hasFocus())) { this.startAutoRefresh(); return; }
 			this.refresh();
 		}, this.autoRefreshTimeoutNum);
 	};
-		
+
 	private _loadExtraInfo(pID:number) : void {
 		if(pID != this.ajaxID) { return; }
 		if(this.secondaryWikiData.length == 0) { mw.log("[RCMManager](_loadExtraInfo) All loading finished."); return; }
-		
+
 		let { url, dataType="jsonp", callback:tCallback, skipRefreshSanity } = this.secondaryWikiData.shift()!;
 		if(typeof url === "function") url = url();
-		
+
 		let tries = 0, retryDelay = 0, MAX_TRIES = 10;
 		const tDoLoad=() => {
 			$.ajax({ type: 'GET', url:url as string, dataType, data: {} })
@@ -1152,10 +1154,10 @@ export default class RCMManager
 			});
 		};
 		tDoLoad();
-		
+
 		setTimeout(() => { this._loadExtraInfo(pID); }, Global.loadDelay);
 	}
-	
+
 	/***************************
 	* Specific Helper Methods
 	***************************/
@@ -1164,24 +1166,24 @@ export default class RCMManager
 		$(`<button class="rcm-btn">${i18n("status-refresh")}</button>`).appendTo(pParent).on("click", ()=>{
 			this.refresh();
 		});
-		
+
 		// let self = this;
 		// Utils.newElement("button", { className:"rcm-btn", innerHTML:i18n('status-refresh') }, pParent).addEventListener("click", function tHandler(e){
 		// 	e.target.removeEventListener("click", tHandler);
 		// 	self.refresh();
 		// });
 	};
-	
+
 	addAutoRefreshInputTo(pParent:HTMLElement) : void {
 		let self = this;
-		
+
 		pParent.appendChild(document.createTextNode(" "));
-		
+
 		let autoRefresh = Utils.newElement("span", { className:"rcm-autoRefresh" }, pParent);
 		Utils.newElement("label", { htmlFor:"rcm-autoRefresh-checkbox", innerHTML:i18n('autorefresh'), title:i18n('autorefresh-tooltip', Math.floor(self.autoRefreshTimeoutNum/1000)) }, autoRefresh);
 		let checkBox:HTMLInputElement = <HTMLInputElement>Utils.newElement("input", { className:"rcm-autoRefresh-checkbox", type:"checkbox" }, autoRefresh);
 		checkBox.checked = this.isAutoRefreshEnabled();
-		
+
 		checkBox.addEventListener("click", function tHandler(e){
 			if((<HTMLInputElement>document.querySelector(self.modID+" .rcm-autoRefresh-checkbox")).checked) {
 				localStorage.setItem(self.autoRefreshLocalStorageID, 'true');
@@ -1193,17 +1195,17 @@ export default class RCMManager
 			}
 		});
 	};
-	
+
 	isAutoRefreshEnabled() : boolean {
 		return localStorage.getItem(this.autoRefreshLocalStorageID) == "true" || this.autoRefreshEnabledDefault;
 	}
-	
+
 	// take a "&" seperated list of RC params, and returns a Object with settings.
 	// NOTE: Script does not currently support: "from" and "namespace" related fields (like invert)
 	parseRCParams(pData:string|undefined, pExplodeOn:string, pSplitOn:string) : Partial<RCParams> {
 		var tRcParams:Partial<RCParams> = {};
 		var paramStringArray:string[] = [];
-		
+
 		if(!pData) { return tRcParams; }
 		var tRcParamsRawData = pData.split(pExplodeOn);
 		var tRcParamsDataSplit, key, val; // Split of raw data
@@ -1231,10 +1233,10 @@ export default class RCMManager
 			}
 		}
 		tRcParams.paramString = paramStringArray.join("&");
-		
+
 		return tRcParams;
 	}
-	
+
 	getDefaultRCParams() : RCParams {
 		return {
 			paramString	: "", // Complete list of params.
